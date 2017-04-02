@@ -71,6 +71,7 @@ set(config_module_list
 	#
 	drivers/gps
 	drivers/rpi_rc_in
+	drivers/rpi_pca9685_pwm_out
 	#drivers/navio_sysfs_rc_in
 	#drivers/navio_sysfs_pwm_out
 	#drivers/navio_gpio
