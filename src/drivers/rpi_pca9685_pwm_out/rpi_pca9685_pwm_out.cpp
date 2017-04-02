@@ -82,7 +82,7 @@ int rpi_pca9685_pwm_out::pwm_initialize()
 	/**************初始化PCA9685开始*************/
 	pwm.init(1,0x40);
 	usleep(1000 * 100);
-	pwm.setPWMFreq (50);
+	pwm.setPWMFreq (200); //12BIT 精度输出下，好赢电调可以到200HZ刷新
 	usleep(1000 * 1000);
 	/**************初始化PCA9685结束************/
 	return 0;
