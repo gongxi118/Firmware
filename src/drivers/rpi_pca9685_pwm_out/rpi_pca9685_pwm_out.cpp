@@ -98,6 +98,7 @@ void rpi_pca9685_pwm_out::send_outputs_pwm(const uint16_t *pwm)
 	//向PCA9685发送数据
 	int i;
 	for(i=0;i<NUM_PWM;++i){
+		PX4_WARN("PWM%d:%d\n",i,*(pwm+i));
 		rpi_pca9685_pwm_out::pwm.setPWM(i,*(pwm+i));
 	}
 }
