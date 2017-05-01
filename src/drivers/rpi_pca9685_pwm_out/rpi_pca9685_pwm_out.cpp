@@ -35,9 +35,9 @@
 using namespace rpi_pca9685_pwm_out;
 //--------------------------------------------------------------------------//
 int rpi_pca9685_pwm_out::mixer_control_callback(uintptr_t handle,
-			   uint8_t control_group,
-			   uint8_t control_index,
-			   float &input)
+		uint8_t control_group,
+		uint8_t control_index,
+		float &input)
 {
 	const actuator_controls_s *controls = (actuator_controls_s *)handle;
 	input = controls[control_group].control[control_index];
@@ -81,11 +81,11 @@ int rpi_pca9685_pwm_out::pwm_initialize()
 {
 	/**************初始化PCA9685开始*************/
 	/**************PCA965 initializing********/
-	pwm.init(1,0x40);
+	pwm.init(1, 0x40);
 	usleep(1000 * 100);
 	/****12BIT 精度输出下，好赢电调可以到200HZ刷新***/
 	/****200HZ for 12bit Resolution, support most of the esc***/
-	pwm.setPWMFreq (200);
+	pwm.setPWMFreq(200);
 	usleep(1000 * 1000);
 	/**************初始化PCA9685结束************/
 	/**************PCA965 initialized********/
@@ -102,9 +102,10 @@ void rpi_pca9685_pwm_out::send_outputs_pwm(const uint16_t *pwm)
 	/*************向PCA9685发送数据*************/
 	/*************send pwm signal to pca9685 initializing*************/
 	int i;
-	for(i=0;i<NUM_PWM;++i){
-		PX4_WARN("PWM%d:%d\n",i,*(pwm+i));
-		rpi_pca9685_pwm_out::pwm.setPWM(i,*(pwm+i));
+
+	for (i = 0; i < NUM_PWM; ++i) {
+		//PX4_WARN("PWM%d:%d\n",i,*(pwm+i));
+		rpi_pca9685_pwm_out::pwm.setPWM(i, *(pwm + i));
 	}
 }
 //----------------------------------------------------------------------------//
