@@ -115,7 +115,7 @@ set(config_df_driver_list
 )
 
 # 设定交叉工具链
-set(CMAKE_TOOLCHAIN_FILE ${PX4_SOURCE_DIR}/cmake/toolchains/Toolchain-arm-bcm2835-linx-gnueabihf-raspbian.cmake)
+set(CMAKE_TOOLCHAIN_FILE ${PX4_SOURCE_DIR}/cmake/toolchains/Toolchain-arm-bcm2835-linux-gnueabihf-raspbian.cmake)
 
 
 #set(CMAKE_PROGRAM_PATH
