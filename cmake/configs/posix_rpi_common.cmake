@@ -8,6 +8,8 @@ include(posix/px4_impl_posix)
 add_definitions(
 	-D__PX4_POSIX_RPI
 	-D__DF_LINUX # For DriverFramework
+	-D__DF_RPI # for raspberry pi
+        -D__DF_RPI_SINGLE # for raspberry pi no shield
 )
 
 
