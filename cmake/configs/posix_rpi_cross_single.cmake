@@ -7,6 +7,7 @@ add_definitions(
 	-D__PX4_POSIX_RPI
 	-D__DF_LINUX # For DriverFramework
 	-D__DF_RPI # For raspberry pi
+	-D__DF_RPI_SINGLE # For raspberry pi without pilot shield
 )
 
 # 硬件驱动模块
@@ -70,6 +71,7 @@ set(config_module_list
 	# PX4 drivers
 	#
 	drivers/gps
+	drivers/linux_sbus
 	drivers/rpi_rc_in
 	drivers/rpi_pca9685_pwm_out
 	#drivers/navio_sysfs_rc_in
