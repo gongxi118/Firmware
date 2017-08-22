@@ -9,6 +9,7 @@ add_definitions(
 	-D__PX4_POSIX_RPI
 	-D__DF_LINUX # For DriverFramework
 	-D__DF_RPI # For DriverFramework
+	-D__DF_RPI_SINGLE # for no sheild
 )
 
 
@@ -75,6 +76,7 @@ set(config_module_list
 	# PX4 drivers
 	#
 	drivers/gps
+	drivers/linux_sbus
 	drivers/navio_adc
 	drivers/navio_sysfs_rc_in
 	drivers/navio_sysfs_pwm_out
