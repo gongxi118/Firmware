@@ -77,6 +77,7 @@ set(config_module_list
 	#
 	drivers/gps
 	drivers/linux_sbus
+	drivers/linux_pwm_out
 	drivers/navio_adc
 	drivers/navio_sysfs_rc_in
 	drivers/navio_sysfs_pwm_out
