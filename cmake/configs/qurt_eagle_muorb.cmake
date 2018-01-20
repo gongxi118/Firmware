@@ -1,4 +1,3 @@
-include(qurt/px4_impl_qurt)
 
 if ("$ENV{HEXAGON_SDK_ROOT}" STREQUAL "")
 	message(FATAL_ERROR "Enviroment variable HEXAGON_SDK_ROOT must be set")
@@ -45,7 +44,6 @@ set(config_module_list
 	lib/conversion
 	lib/version
 	lib/DriverFramework/framework
-	lib/micro-CDR
 
 	#
 	# QuRT port

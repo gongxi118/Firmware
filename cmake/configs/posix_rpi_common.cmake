@@ -1,7 +1,6 @@
 # This file is shared between posix_rpi_native.cmake
 # and posix_rpi_cross.cmake.
 
-include(posix/px4_impl_posix)
 
 # This definition allows to differentiate if this just the usual POSIX build
 # or if it is for the RPi.
@@ -16,7 +15,12 @@ set(config_module_list
 	#
 	# Board support modules
 	#
+	drivers/airspeed
 	drivers/device
+	drivers/distance_sensor
+	#drivers/barometer
+	drivers/differential_pressure
+
 	modules/sensors
 	platforms/posix/drivers/df_mpu9250_wrapper
 	platforms/posix/drivers/df_lsm9ds1_wrapper
@@ -64,7 +68,6 @@ set(config_module_list
 	modules/commander
 	modules/systemlib/param
 	modules/systemlib
-	modules/systemlib/mixer
 	modules/uORB
 	modules/dataman
 	modules/land_detector
@@ -88,21 +91,20 @@ set(config_module_list
 	# Libraries
 	#
 	lib/controllib
-	lib/mathlib
-	lib/mathlib/math/filter
-	lib/geo
+	lib/conversion
+	lib/DriverFramework/framework
 	lib/ecl
+	lib/geo
 	lib/geo_lookup
 	lib/launchdetection
 	lib/led
-	lib/external_lgpl
-	lib/conversion
-	lib/terrain_estimation
+	lib/mathlib
+	lib/mathlib/math/filter
+	lib/mixer
 	lib/runway_takeoff
 	lib/tailsitter_recovery
+	lib/terrain_estimation
 	lib/version
-	lib/DriverFramework/framework
-	lib/micro-CDR
 
 	#
 	# POSIX

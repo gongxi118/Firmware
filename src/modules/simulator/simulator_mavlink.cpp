@@ -45,6 +45,7 @@
 #include <pthread.h>
 #include <conversion/rotation.h>
 #include <mathlib/mathlib.h>
+#include <uORB/topics/vehicle_local_position.h>
 
 extern "C" __EXPORT hrt_abstime hrt_reset(void);
 
@@ -54,8 +55,6 @@ extern "C" __EXPORT hrt_abstime hrt_reset(void);
 #define PRESS_GROUND 101325.0f
 #define DENSITY 1.2041f
 
-static const uint8_t mavlink_message_lengths[256] = MAVLINK_MESSAGE_LENGTHS;
-static const uint8_t mavlink_message_crcs[256] = MAVLINK_MESSAGE_CRCS;
 static const float mg2ms2 = CONSTANTS_ONE_G / 1000.0f;
 
 #ifdef ENABLE_UART_RC_INPUT
@@ -179,9 +178,12 @@ void Simulator::send_controls()
 			continue;
 		}
 
-		mavlink_hil_actuator_controls_t msg;
-		pack_actuator_message(msg, i);
-		send_mavlink_message(MAVLINK_MSG_ID_HIL_ACTUATOR_CONTROLS, &msg, 200);
+		mavlink_hil_actuator_controls_t hil_act_control = {};
+		mavlink_message_t message = {};
+		pack_actuator_message(hil_act_control, i);
+		mavlink_msg_hil_actuator_controls_encode(0, 200, &message, &hil_act_control);
+		send_mavlink_message(message);
+
 	}
 }
 
@@ -253,7 +255,7 @@ void Simulator::update_sensors(mavlink_hil_sensor_t *imu)
 
 	RawAirspeedData airspeed = {};
 	airspeed.temperature = imu->temperature;
-	airspeed.diff_pressure = imu->diff_pressure + 0.001f * (hrt_absolute_time() & 0x01);;
+	airspeed.diff_pressure = imu->diff_pressure + 0.001f * (hrt_absolute_time() & 0x01);
 
 	write_airspeed_data(&airspeed);
 }
@@ -355,39 +357,33 @@ void Simulator::handle_message(mavlink_message_t *msg, bool publish)
 
 			update_sensors(&imu);
 
-			// battery simulation
-			const float discharge_interval_us = 60 * 1000 * 1000;
+			// battery simulation (limit update to 100Hz)
+			if (hrt_elapsed_time(&_battery_status.timestamp) >= 10000) {
 
-			bool armed = (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED);
+				const float discharge_interval_us = _battery_drain_interval_s.get() * 1000 * 1000;
 
-			if (!armed || batt_sim_start == 0 || batt_sim_start > now) {
-				batt_sim_start = now;
+				bool armed = (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED);
+
+				if (!armed || batt_sim_start == 0 || batt_sim_start > now) {
+					batt_sim_start = now;
+				}
+
+				float ibatt = -1.0f; // no current sensor in simulation
+				const float minimum_percentage = 0.5f; // change this value if you want to simulate low battery reaction
+
+				/* Simulate the voltage of a linearly draining battery but stop at the minimum percentage */
+				float battery_percentage = (now - batt_sim_start) / discharge_interval_us;
+				battery_percentage = math::min(battery_percentage, minimum_percentage);
+				float vbatt = math::gradual(battery_percentage, 0.f, 1.f, _battery.full_cell_voltage(), _battery.empty_cell_voltage());
+				vbatt *= _battery.cell_count();
+
+				const float throttle = 0.0f; // simulate no throttle compensation to make the estimate predictable
+				_battery.updateBatteryStatus(now, vbatt, ibatt, true, true, 0, throttle, armed, &_battery_status);
+
+				// publish the battery voltage
+				int batt_multi;
+				orb_publish_auto(ORB_ID(battery_status), &_battery_pub, &_battery_status, &batt_multi, ORB_PRIO_HIGH);
 			}
-
-			unsigned cellcount = _battery.cell_count();
-
-			float vbatt = _battery.full_cell_voltage() ;
-			float ibatt = -1.0f;
-
-			float discharge_v = _battery.full_cell_voltage() - _battery.empty_cell_voltage();
-
-			vbatt = (_battery.full_cell_voltage() - (discharge_v * ((now - batt_sim_start) / discharge_interval_us)))  * cellcount;
-
-			float batt_voltage_loaded = _battery.empty_cell_voltage() - 0.05f;
-
-			if (!PX4_ISFINITE(vbatt) || (vbatt < (cellcount * batt_voltage_loaded))) {
-				vbatt = cellcount * batt_voltage_loaded;
-			}
-
-			battery_status_s battery_status = {};
-
-			// TODO: don't hard-code throttle.
-			const float throttle = 0.5f;
-			_battery.updateBatteryStatus(now, vbatt, ibatt, true, true, 0, throttle, armed, &battery_status);
-
-			// publish the battery voltage
-			int batt_multi;
-			orb_publish_auto(ORB_ID(battery_status), &_battery_pub, &battery_status, &batt_multi, ORB_PRIO_HIGH);
 		}
 		break;
 
@@ -433,6 +429,25 @@ void Simulator::handle_message(mavlink_message_t *msg, bool publish)
 
 		break;
 
+	case MAVLINK_MSG_ID_LANDING_TARGET:
+		mavlink_landing_target_t landing_target_mavlink;
+		mavlink_msg_landing_target_decode(msg, &landing_target_mavlink);
+
+		struct irlock_report_s report;
+		memset(&report, 0, sizeof(report));
+
+		report.timestamp = hrt_absolute_time();
+		report.signature = landing_target_mavlink.target_num;
+		report.pos_x = landing_target_mavlink.angle_x;
+		report.pos_y = landing_target_mavlink.angle_y;
+		report.size_x = landing_target_mavlink.size_x;
+		report.size_y = landing_target_mavlink.size_y;
+
+		int irlock_multi;
+		orb_publish_auto(ORB_ID(irlock_report), &_irlock_report_pub, &report, &irlock_multi, ORB_PRIO_HIGH);
+
+		break;
+
 	case MAVLINK_MSG_ID_HIL_STATE_QUATERNION:
 		mavlink_hil_state_quaternion_t hil_state;
 		mavlink_msg_hil_state_quaternion_decode(msg, &hil_state);
@@ -461,7 +476,6 @@ void Simulator::handle_message(mavlink_message_t *msg, bool publish)
 		{
 			hil_gpos.timestamp = timestamp;
 
-			hil_gpos.time_utc_usec = timestamp;
 			hil_gpos.lat = hil_state.lat / 1E7;//1E7
 			hil_gpos.lon = hil_state.lon / 1E7;//1E7
 			hil_gpos.alt = hil_state.alt / 1E3;//1E3
@@ -490,7 +504,7 @@ void Simulator::handle_message(mavlink_message_t *msg, bool publish)
 				_hil_ref_timestamp = timestamp;
 				_hil_ref_lat = lat;
 				_hil_ref_lon = lon;
-				_hil_ref_alt = hil_state.alt / 1000.0f;;
+				_hil_ref_alt = hil_state.alt / 1000.0f;
 			}
 
 			float x;
@@ -529,36 +543,16 @@ void Simulator::handle_message(mavlink_message_t *msg, bool publish)
 
 }
 
-void Simulator::send_mavlink_message(const uint8_t msgid, const void *msg, uint8_t component_ID)
+void Simulator::send_mavlink_message(const mavlink_message_t &aMsg)
 {
-	component_ID = 0;
-	uint8_t payload_len = mavlink_message_lengths[msgid];
-	unsigned packet_len = payload_len + MAVLINK_NUM_NON_PAYLOAD_BYTES;
+	uint8_t  buf[MAVLINK_MAX_PACKET_LEN];
+	uint16_t bufLen = 0;
 
-	uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+	// convery mavlink message to raw data
+	bufLen = mavlink_msg_to_send_buffer(buf, &aMsg);
 
-	/* header */
-	buf[0] = MAVLINK_STX;
-	buf[1] = payload_len;
-	/* no idea which numbers should be here*/
-	buf[2] = 100;
-	buf[3] = 0;
-	buf[4] = component_ID;
-	buf[5] = msgid;
-
-	/* payload */
-	memcpy(&buf[MAVLINK_NUM_HEADER_BYTES], msg, payload_len);
-
-	/* checksum */
-	uint16_t checksum;
-	crc_init(&checksum);
-	crc_accumulate_buffer(&checksum, (const char *) &buf[1], MAVLINK_CORE_HEADER_LEN + payload_len);
-	crc_accumulate(mavlink_message_crcs[msgid], &checksum);
-
-	buf[MAVLINK_NUM_HEADER_BYTES + payload_len] = (uint8_t)(checksum & 0xFF);
-	buf[MAVLINK_NUM_HEADER_BYTES + payload_len + 1] = (uint8_t)(checksum >> 8);
-
-	ssize_t len = sendto(_fd, buf, packet_len, 0, (struct sockaddr *)&_srcaddr, _addrlen);
+	// send data
+	ssize_t len = sendto(_fd, buf, bufLen, 0, (struct sockaddr *)&_srcaddr, _addrlen);
 
 	if (len <= 0) {
 		PX4_WARN("Failed sending mavlink message");
@@ -625,6 +619,7 @@ void Simulator::send()
 
 		if (fds[0].revents & POLLIN) {
 			// got new data to read, update all topics
+			parameters_update(false);
 			poll_topics();
 			send_controls();
 		}
@@ -761,9 +756,11 @@ void Simulator::pollForMAVLinkMessages(bool publish, int udp_port)
 			len = recvfrom(_fd, _buf, sizeof(_buf), 0, (struct sockaddr *)&_srcaddr, &_addrlen);
 			// send hearbeat
 			mavlink_heartbeat_t hb = {};
+			mavlink_message_t message = {};
 			hb.autopilot = 12;
 			hb.base_mode |= (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED) ? 128 : 0;
-			send_mavlink_message(MAVLINK_MSG_ID_HEARTBEAT, &hb, 200);
+			mavlink_msg_heartbeat_encode(0, 50, &message, &hb);
+			send_mavlink_message(message);
 
 			if (len > 0) {
 				mavlink_message_t msg;
@@ -810,10 +807,13 @@ void Simulator::pollForMAVLinkMessages(bool publish, int udp_port)
 
 	//send MAV_CMD_SET_MESSAGE_INTERVAL for HIL_STATE_QUATERNION ground truth
 	mavlink_command_long_t cmd_long = {};
+	mavlink_message_t message = {};
 	cmd_long.command = MAV_CMD_SET_MESSAGE_INTERVAL;
 	cmd_long.param1 = MAVLINK_MSG_ID_HIL_STATE_QUATERNION;
 	cmd_long.param2 = 5e3;
-	send_mavlink_message(MAVLINK_MSG_ID_COMMAND_LONG, &cmd_long, 200);
+	mavlink_msg_command_long_encode(0, 50, &message, &cmd_long);
+	send_mavlink_message(message);
+
 
 	_initialized = true;
 
@@ -1105,8 +1105,9 @@ int Simulator::publish_flow_topic(mavlink_hil_optical_flow_t *flow_mavlink)
 	flow.quality = flow_mavlink->quality;
 
 	/* rotate measurements according to parameter */
-	enum Rotation flow_rot;
-	param_get(param_find("SENS_FLOW_ROT"), &flow_rot);
+	int32_t flow_rot_int;
+	param_get(param_find("SENS_FLOW_ROT"), &flow_rot_int);
+	const enum Rotation flow_rot = (Rotation)flow_rot_int;
 
 	float zeroval = 0.0f;
 	rotate_3f(flow_rot, flow.pixel_flow_x_integral, flow.pixel_flow_y_integral, zeroval);
@@ -1124,13 +1125,15 @@ int Simulator::publish_ev_topic(mavlink_vision_position_estimate_t *ev_mavlink)
 
 	struct vehicle_local_position_s vision_position = {};
 
-	// Use the estimator type to identify the simple vision estimate
-	vision_position.estimator_type = MAV_ESTIMATOR_TYPE_VISION;
-
 	vision_position.timestamp = timestamp;
 	vision_position.x = ev_mavlink->x;
 	vision_position.y = ev_mavlink->y;
 	vision_position.z = ev_mavlink->z;
+
+	vision_position.xy_valid = true;
+	vision_position.z_valid = true;
+	vision_position.v_xy_valid = true;
+	vision_position.v_z_valid = true;
 
 	struct vehicle_attitude_s vision_attitude = {};
 

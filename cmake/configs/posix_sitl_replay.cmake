@@ -1,4 +1,3 @@
-include(posix/px4_impl_posix)
 
 set(CMAKE_TOOLCHAIN_FILE ${PX4_SOURCE_DIR}/cmake/toolchains/Toolchain-native.cmake)
 
@@ -23,7 +22,6 @@ set(config_module_list
 	lib/mathlib/math/filter
 	lib/conversion
 	lib/ecl
-	lib/external_lgpl
 	lib/geo
 	lib/geo_lookup
 	lib/version

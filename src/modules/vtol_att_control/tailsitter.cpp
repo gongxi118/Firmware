@@ -42,7 +42,7 @@
 #include "tailsitter.h"
 #include "vtol_att_control_main.h"
 
-#define ARSP_YAW_CTRL_DISABLE 7.0f	// airspeed at which we stop controlling yaw during a front transition
+#define ARSP_YAW_CTRL_DISABLE 4.0f	// airspeed at which we stop controlling yaw during a front transition
 #define THROTTLE_TRANSITION_MAX 0.25f	// maximum added thrust above last value in transition
 #define PITCH_TRANSITION_FRONT_P1 -1.1f	// pitch angle to switch to TRANSITION_P2
 #define PITCH_TRANSITION_FRONT_P2 -1.2f	// pitch angle to switch to FW
@@ -50,13 +50,10 @@
 
 Tailsitter::Tailsitter(VtolAttitudeControl *attc) :
 	VtolType(attc),
-	_airspeed_tot(0.0f),
 	_min_front_trans_dur(0.5f),
 	_thrust_transition_start(0.0f),
 	_yaw_transition(0.0f),
-	_pitch_transition_start(0.0f),
-	_loop_perf(perf_alloc(PC_ELAPSED, "vtol_att_control-tailsitter")),
-	_nonfinite_input_perf(perf_alloc(PC_COUNT, "vtol att control-tailsitter nonfinite input"))
+	_pitch_transition_start(0.0f)
 {
 	_vtol_schedule.flight_mode = MC_MODE;
 	_vtol_schedule.transition_start = 0;
@@ -72,8 +69,6 @@ Tailsitter::Tailsitter(VtolAttitudeControl *attc) :
 	_params_handles_tailsitter.back_trans_dur = param_find("VT_B_TRANS_DUR");
 	_params_handles_tailsitter.airspeed_trans = param_find("VT_ARSP_TRANS");
 	_params_handles_tailsitter.airspeed_blend_start = param_find("VT_ARSP_BLEND");
-	_params_handles_tailsitter.elevons_mc_lock = param_find("VT_ELEV_MC_LOCK");
-
 }
 
 Tailsitter::~Tailsitter()
@@ -85,7 +80,6 @@ void
 Tailsitter::parameters_update()
 {
 	float v;
-	int l;
 
 	/* vtol duration of a front transition */
 	param_get(_params_handles_tailsitter.front_trans_dur, &v);
@@ -106,10 +100,6 @@ Tailsitter::parameters_update()
 	/* vtol airspeed at which we start blending mc/fw controls */
 	param_get(_params_handles_tailsitter.airspeed_blend_start, &v);
 	_params_tailsitter.airspeed_blend_start = v;
-
-	/* vtol lock elevons in multicopter */
-	param_get(_params_handles_tailsitter.elevons_mc_lock, &l);
-	_params_tailsitter.elevons_mc_lock = l;
 
 	/* avoid parameters which will lead to zero division in the transition code */
 	_params_tailsitter.front_trans_dur = math::max(_params_tailsitter.front_trans_dur, _min_front_trans_dur);
@@ -132,7 +122,6 @@ void Tailsitter::update_vtol_state()
 	float pitch = euler.theta();
 
 	if (!_attc->is_fixed_wing_requested()) {
-
 
 		switch (_vtol_schedule.flight_mode) { // user switchig to MC mode
 		case MC_MODE:
@@ -236,7 +225,9 @@ void Tailsitter::update_transition_state()
 	if (!_flag_was_in_trans_mode) {
 		// save desired heading for transition and last thrust value
 		_yaw_transition = _v_att_sp->yaw_body;
-		_pitch_transition_start = _v_att_sp->pitch_body;
+		//transition should start from current attitude instead of current setpoint
+		matrix::Eulerf euler = matrix::Quatf(_v_att->q);
+		_pitch_transition_start = euler.theta();
 		_thrust_transition_start = _v_att_sp->thrust;
 		_flag_was_in_trans_mode = true;
 	}
@@ -332,9 +323,6 @@ void Tailsitter::update_transition_state()
 
 	}
 
-
-
-
 	_mc_roll_weight = math::constrain(_mc_roll_weight, 0.0f, 1.0f);
 	_mc_yaw_weight = math::constrain(_mc_yaw_weight, 0.0f, 1.0f);
 	_mc_pitch_weight = math::constrain(_mc_pitch_weight, 0.0f, 1.0f);
@@ -354,58 +342,6 @@ void Tailsitter::waiting_on_tecs()
 {
 	// copy the last trust value from the front transition
 	_v_att_sp->thrust = _thrust_transition;
-}
-
-void Tailsitter::calc_tot_airspeed()
-{
-	float airspeed = math::max(1.0f, _airspeed->indicated_airspeed_m_s);	// prevent numerical drama
-	// calculate momentary power of one engine
-	float P = _batt_status->voltage_filtered_v * _batt_status->current_a / _params->vtol_motor_count;
-	P = math::constrain(P, 1.0f, _params->power_max);
-	// calculate prop efficiency
-	float power_factor = 1.0f - P * _params->prop_eff / _params->power_max;
-	float eta = (1.0f / (1 + expf(-0.4f * power_factor * airspeed)) - 0.5f) * 2.0f;
-	eta = math::constrain(eta, 0.001f, 1.0f);	// live on the safe side
-	// calculate induced airspeed by propeller
-	float v_ind = (airspeed / eta - airspeed) * 2.0f;
-	// calculate total airspeed
-	float airspeed_raw = airspeed + v_ind;
-	// apply low-pass filter
-	_airspeed_tot = _params->arsp_lp_gain * (_airspeed_tot - airspeed_raw) + airspeed_raw;
-}
-
-void Tailsitter::scale_mc_output()
-{
-	// scale around tuning airspeed
-	float airspeed;
-	calc_tot_airspeed();	// estimate air velocity seen by elevons
-
-	// if airspeed is not updating, we assume the normal average speed
-	if (bool nonfinite = !PX4_ISFINITE(_airspeed->indicated_airspeed_m_s) ||
-			     hrt_elapsed_time(&_airspeed->timestamp) > 1e6) {
-		airspeed = _params->mc_airspeed_trim;
-
-		if (nonfinite) {
-			perf_count(_nonfinite_input_perf);
-		}
-
-	} else {
-		airspeed = _airspeed_tot;
-		airspeed = math::constrain(airspeed, _params->mc_airspeed_min, _params->mc_airspeed_max);
-	}
-
-	_vtol_vehicle_status->airspeed_tot = airspeed;	// save value for logging
-	/*
-	 * For scaling our actuators using anything less than the min (close to stall)
-	 * speed doesn't make any sense - its the strongest reasonable deflection we
-	 * want to do in flight and its the baseline a human pilot would choose.
-	 *
-	 * Forcing the scaling to this value allows reasonable handheld tests.
-	 */
-	float airspeed_scaling = _params->mc_airspeed_trim / ((airspeed < _params->mc_airspeed_min) ? _params->mc_airspeed_min :
-				 airspeed);
-	_actuators_mc_in->control[1] = math::constrain(_actuators_mc_in->control[1] * airspeed_scaling * airspeed_scaling,
-				       -1.0f, 1.0f);
 }
 
 void Tailsitter::update_mc_state()
@@ -446,7 +382,7 @@ void Tailsitter::fill_actuator_outputs()
 
 		_actuators_out_1->timestamp = _actuators_mc_in->timestamp;
 
-		if (_params->elevons_mc_lock == 1) {
+		if (_params->elevons_mc_lock) {
 			_actuators_out_1->control[0] = 0;
 			_actuators_out_1->control[1] = 0;
 
@@ -495,16 +431,12 @@ void Tailsitter::fill_actuator_outputs()
 
 		// NOTE: There is no mistake in the line below, multicopter yaw axis is controlled by elevon roll actuation!
 		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL]
-				* (1 - _mc_roll_weight);
+				* (1 - _mc_yaw_weight);
 		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] =
 			_actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] * _mc_pitch_weight;
 		// **LATER** + (_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH] + _params->fw_pitch_trim) *(1 - _mc_pitch_weight);
 		_actuators_out_1->control[actuator_controls_s::INDEX_THROTTLE] =
 			_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE];
-		break;
-
-	case EXTERNAL:
-		// not yet implemented, we are switching brute force at the moment
 		break;
 	}
 }

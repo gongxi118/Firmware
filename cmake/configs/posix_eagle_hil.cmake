@@ -1,4 +1,3 @@
-include(posix/px4_impl_posix)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PX4_SOURCE_DIR}/cmake/cmake_hexagon")
 
@@ -20,7 +19,7 @@ endif()
 
 set(config_module_list
 	drivers/device
-	drivers/boards/sitl
+	drivers/boards
 	drivers/led
 	drivers/linux_sbus
 
@@ -48,7 +47,6 @@ set(config_module_list
 	lib/conversion
 	lib/version
 	lib/DriverFramework/framework
-	lib/micro-CDR
 
 	platforms/common
 	platforms/posix/px4_layer
