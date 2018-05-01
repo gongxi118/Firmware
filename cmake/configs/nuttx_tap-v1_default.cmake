@@ -7,15 +7,11 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/airspeed
-	drivers/boards
-	drivers/device
 	drivers/barometer
 	drivers/differential_pressure
 	drivers/gps
-	drivers/led
 	drivers/magnetometer/hmc5883
-	drivers/mpu6000
+	drivers/imu/mpu6000
 	drivers/px4fmu
 	drivers/rgbled_pwm
 	drivers/stm32
@@ -44,6 +40,7 @@ set(config_module_list
 	systemcmds/dumpfile
 	systemcmds/ver
 	systemcmds/topic_listener
+	systemcmds/tune_control
 
 	#
 	# General system control
@@ -76,33 +73,5 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/uORB
 	modules/dataman
-
-	#
-	# Libraries
-	#
-	lib/controllib
-	lib/conversion
-	lib/DriverFramework/framework
-	lib/ecl
-	lib/geo
-	lib/geo_lookup
-	lib/launchdetection
-	lib/led
-	lib/mathlib
-	lib/mathlib/math/filter
-	lib/mixer
-	lib/rc
-	lib/runway_takeoff
-	lib/tailsitter_recovery
-	lib/terrain_estimation
-	lib/version
-	platforms/nuttx
-
-	# had to add for cmake, not sure why wasn't in original config
-	platforms/common
-	platforms/nuttx/px4_layer
 )

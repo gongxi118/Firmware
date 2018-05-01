@@ -11,25 +11,15 @@ set(config_module_list
 	drivers/differential_pressure
 	drivers/distance_sensor
 	drivers/magnetometer
+	drivers/telemetry
+	drivers/imu
 
-	drivers/airspeed
+	drivers/batt_smbus
 	drivers/blinkm
-	drivers/bma180
-	drivers/bmi055
-	drivers/bmi160
-	drivers/boards
-	drivers/bst
 	drivers/camera_trigger
-	drivers/device
-	drivers/frsky_telemetry
 	drivers/gps
-	drivers/hott
-	drivers/iridiumsbd
 	drivers/irlock
-	drivers/led
 	drivers/mkblctrl
-	drivers/mpu6000
-	drivers/mpu9250
 	drivers/oreoled
 	drivers/pca9685
 	drivers/pwm_input
@@ -64,6 +54,7 @@ set(config_module_list
 	systemcmds/sd_bench
 	systemcmds/top
 	systemcmds/topic_listener
+	systemcmds/tune_control
 	systemcmds/ver
 
 	#
@@ -100,6 +91,7 @@ set(config_module_list
 	modules/landing_target_estimator
 	modules/local_position_estimator
 	modules/position_estimator_inav
+	modules/wind_estimator
 
 	#
 	# Vehicle Control
@@ -121,37 +113,7 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/uORB
 	modules/dataman
-
-	#
-	# Libraries
-	#
-	lib/controllib
-	lib/conversion
-	lib/DriverFramework/framework
-	lib/ecl
-	lib/geo
-	lib/geo_lookup
-	lib/launchdetection
-	lib/led
-	lib/mathlib
-	lib/mathlib/math/filter
-	lib/mixer
-	lib/rc
-	lib/runway_takeoff
-	lib/tailsitter_recovery
-	lib/terrain_estimation
-	lib/version
-
-	#
-	# Platform
-	#
-	platforms/common
-	platforms/nuttx
-	platforms/nuttx/px4_layer
 
 	#
 	# OBC challenge
@@ -175,10 +137,6 @@ set(config_module_list
 	# Tutorial code from
 	# https://px4.io/dev/px4_simple_app
 	examples/px4_simple_app
-
-	# Tutorial code from
-	# https://px4.io/dev/daemon
-	examples/px4_daemon_app
 
 	# Tutorial code from
 	# https://px4.io/dev/debug_values

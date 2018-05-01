@@ -133,6 +133,7 @@
 #define PX4_SPI_BUS_SENSORS          1
 #define PX4_SPI_BUS_RAMTRON          2
 #define PX4_SPI_BUS_BARO             PX4_SPI_BUS_RAMTRON
+#define PX4_SPI_BUS_EXT              1
 
 /* Use these in place of the uint32_t enumeration to select a specific SPI device on SPI1 */
 #define PX4_SPIDEV_GYRO              PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 1)
@@ -147,6 +148,7 @@
 #define PX4_SPIDEV_ICM_20602         PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 11)
 #define PX4_SPIDEV_BMI055_ACC        PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 12)
 #define PX4_SPIDEV_BMI055_GYR        PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 13)
+#define PX4_SPIDEV_EXT_MPU           PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 14)
 
 /* onboard MS5611 and FRAM are both on bus SPI2
  * spi_dev_e:SPIDEV_FLASH has the value 2 and is used in the NuttX ramtron driver
@@ -162,9 +164,6 @@
  *
  * Note that these are unshifted addresses.
  */
-#define PX4_I2C_OBDEV_LED            0x55
-#define PX4_I2C_OBDEV_HMC5883        0x1e
-#define PX4_I2C_OBDEV_LIS3MDL        0x1e
 #define PX4_I2C_OBDEV_BMP280         0x76
 
 /*

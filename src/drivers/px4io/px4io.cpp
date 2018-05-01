@@ -68,10 +68,10 @@
 #include <drivers/drv_mixer.h>
 
 #include <lib/mixer/mixer.h>
-#include <systemlib/perf_counter.h>
+#include <perf/perf_counter.h>
 #include <systemlib/err.h>
 #include <systemlib/systemlib.h>
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include <systemlib/circuit_breaker.h>
 #include <systemlib/mavlink_log.h>
 
@@ -589,8 +589,6 @@ PX4IO::init()
 	int ret;
 	param_t sys_restart_param;
 	int32_t sys_restart_val = DM_INIT_REASON_VOLATILE;
-
-	ASSERT(_task == -1);
 
 	sys_restart_param = param_find("SYS_RESTART_TYPE");
 
@@ -1220,6 +1218,15 @@ PX4IO::task_main()
 				if (parm_handle != PARAM_INVALID) {
 					param_get(parm_handle, &param_val);
 					(void)io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_MOTOR_SLEW_MAX, FLOAT_TO_REG(param_val));
+				}
+
+				/* air-mode */
+				parm_handle = param_find("MC_AIRMODE");
+
+				if (parm_handle != PARAM_INVALID) {
+					int32_t param_val_int;
+					param_get(parm_handle, &param_val_int);
+					(void)io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_AIRMODE, SIGNED_TO_REG(param_val_int));
 				}
 			}
 

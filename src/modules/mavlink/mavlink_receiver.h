@@ -41,7 +41,7 @@
 
 #pragma once
 
-#include <systemlib/perf_counter.h>
+#include <perf/perf_counter.h>
 #include <uORB/uORB.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/rc_channels.h>
@@ -74,9 +74,11 @@
 #include <uORB/topics/time_offset.h>
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/follow_target.h>
+#include <uORB/topics/landing_target_pose.h>
 #include <uORB/topics/transponder_report.h>
 #include <uORB/topics/gps_inject_data.h>
 #include <uORB/topics/collision_report.h>
+#include <uORB/topics/obstacle_distance.h>
 
 #include "mavlink_mission.h"
 #include "mavlink_parameters.h"
@@ -148,6 +150,7 @@ private:
 	void handle_message_hil_state_quaternion(mavlink_message_t *msg);
 	void handle_message_distance_sensor(mavlink_message_t *msg);
 	void handle_message_follow_target(mavlink_message_t *msg);
+	void handle_message_landing_target(mavlink_message_t *msg);
 	void handle_message_adsb_vehicle(mavlink_message_t *msg);
 	void handle_message_collision(mavlink_message_t *msg);
 	void handle_message_gps_rtcm_data(mavlink_message_t *msg);
@@ -155,6 +158,7 @@ private:
 	void handle_message_serial_control(mavlink_message_t *msg);
 	void handle_message_logging_ack(mavlink_message_t *msg);
 	void handle_message_play_tune(mavlink_message_t *msg);
+	void handle_message_obstacle_distance(mavlink_message_t *msg);
 	void handle_message_named_value_float(mavlink_message_t *msg);
 	void handle_message_debug(mavlink_message_t *msg);
 	void handle_message_debug_vect(mavlink_message_t *msg);
@@ -201,7 +205,7 @@ private:
 
 	Mavlink	*_mavlink;
 
-	MavlinkMissionManager		_mission_manager;
+	MavlinkMissionManager		*_mission_manager;
 	MavlinkParametersManager	_parameters_manager;
 	MavlinkFTP			_mavlink_ftp;
 	MavlinkLogHandler		_mavlink_log_handler;
@@ -236,9 +240,11 @@ private:
 	orb_advert_t _telemetry_status_pub;
 	orb_advert_t _rc_pub;
 	orb_advert_t _manual_pub;
+	orb_advert_t _obstacle_distance_pub;
 	orb_advert_t _land_detector_pub;
 	orb_advert_t _time_offset_pub;
 	orb_advert_t _follow_target_pub;
+	orb_advert_t _landing_target_pose_pub;
 	orb_advert_t _transponder_report_pub;
 	orb_advert_t _collision_report_pub;
 	orb_advert_t _debug_key_value_pub;
