@@ -155,7 +155,6 @@ private:
 	float			_accel_range_m_s2;
 	orb_advert_t		_accel_topic;
 	int			_accel_orb_class_instance;
-	int			_accel_class_instance;
 
 	ringbuffer::RingBuffer	*_gyro_reports;
 
@@ -168,12 +167,9 @@ private:
 	perf_counter_t		_sample_perf;
 	perf_counter_t		_good_transfers;
 	perf_counter_t		_reset_retries;
-	perf_counter_t		_controller_latency_perf;
 
 	Integrator _accel_int;
 	Integrator _gyro_int;
-
-	enum Rotation		_rotation;
 
 	// last temperature reading for print_info()
 	float			_last_temperature;
@@ -246,8 +242,8 @@ private:
 	void _set_sample_rate(unsigned desired_sample_rate_hz);
 
 	/* do not allow to copy this class due to pointer data members */
-	GYROSIM(const GYROSIM &);
-	GYROSIM operator=(const GYROSIM &);
+	GYROSIM(const GYROSIM &) = delete;
+	GYROSIM operator=(const GYROSIM &) = delete;
 
 #pragma pack(push, 1)
 	/**
@@ -279,7 +275,7 @@ class GYROSIM_gyro  : public VirtDevObj
 {
 public:
 	GYROSIM_gyro(GYROSIM *parent, const char *path);
-	virtual ~GYROSIM_gyro() {}
+	virtual ~GYROSIM_gyro() = default;
 
 	virtual ssize_t		devRead(void *buffer, size_t buflen);
 	virtual int		devIOCTL(unsigned long cmd, unsigned long arg);
@@ -296,8 +292,8 @@ private:
 	int			_gyro_orb_class_instance;
 
 	/* do not allow to copy this class due to pointer data members */
-	GYROSIM_gyro(const GYROSIM_gyro &);
-	GYROSIM_gyro operator=(const GYROSIM_gyro &);
+	GYROSIM_gyro(const GYROSIM_gyro &) = delete;
+	GYROSIM_gyro operator=(const GYROSIM_gyro &) = delete;
 };
 
 /** driver 'main' command */
@@ -313,7 +309,6 @@ GYROSIM::GYROSIM(const char *path_accel, const char *path_gyro, enum Rotation ro
 	_accel_range_m_s2(0.0f),
 	_accel_topic(nullptr),
 	_accel_orb_class_instance(-1),
-	_accel_class_instance(-1),
 	_gyro_reports(nullptr),
 	_gyro_scale{},
 	_gyro_range_scale(0.0f),
@@ -323,10 +318,8 @@ GYROSIM::GYROSIM(const char *path_accel, const char *path_gyro, enum Rotation ro
 	_sample_perf(perf_alloc(PC_ELAPSED, "gyrosim_read")),
 	_good_transfers(perf_alloc(PC_COUNT, "gyrosim_good_transfers")),
 	_reset_retries(perf_alloc(PC_COUNT, "gyrosim_reset_retries")),
-	_controller_latency_perf(perf_alloc_once(PC_ELAPSED, "ctrl_latency")),
 	_accel_int(1000000 / GYROSIM_ACCEL_DEFAULT_RATE, true),
 	_gyro_int(1000000 / GYROSIM_GYRO_DEFAULT_RATE, true),
-	_rotation(rotation),
 	_last_temperature(0)
 {
 
@@ -1093,8 +1086,6 @@ GYROSIM::_measure()
 
 	if (accel_notify) {
 		if (!(_pub_blocked)) {
-			/* log the time of this report */
-			perf_begin(_controller_latency_perf);
 			/* publish it */
 			orb_publish(ORB_ID(sensor_accel), _accel_topic, &arb);
 		}
