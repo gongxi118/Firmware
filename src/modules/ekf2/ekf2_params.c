@@ -607,7 +607,7 @@ PARAM_DEFINE_FLOAT(EKF2_TAS_GATE, 3.0f);
  * Set bits in the following positions to enable:
  * 0 : Set to true to use GPS data if available
  * 1 : Set to true to use optical flow data if available
- * 2 : Set to true to inhibit IMU bias estimation
+ * 2 : Set to true to inhibit IMU delta velocity bias estimation
  * 3 : Set to true to enable vision position fusion
  * 4 : Set to true to enable vision yaw fusion. Cannot be used if bit position 7 is true.
  * 5 : Set to true to enable multi-rotor drag specific force fusion
@@ -689,7 +689,9 @@ PARAM_DEFINE_FLOAT(EKF2_RNG_SFE, 0.05f);
 PARAM_DEFINE_FLOAT(EKF2_RNG_GATE, 5.0f);
 
 /**
- * Minimum valid range for the range finder
+ * Expected range finder reading when on ground.
+ *
+ * If the vehicle is on ground, is not moving as determined by the motion test controlled by EKF2_MOVE_TEST and the range finder is returning invalid or no data, then an assumed range value of EKF2_MIN_RNG will be used by the terrain estimator so that a terrain height estimate is avilable at the start of flight in situations where the range finder may be inside its minimum measurements distance when on ground.
  *
  * @group EKF2
  * @min 0.01
@@ -1129,6 +1131,7 @@ PARAM_DEFINE_INT32(EKF2_RNG_AID, 0);
  * @group EKF2
  * @min 0.1
  * @max 2
+ * @unit m/s
  */
 PARAM_DEFINE_FLOAT(EKF2_RNG_A_VMAX, 1.0f);
 
@@ -1141,6 +1144,7 @@ PARAM_DEFINE_FLOAT(EKF2_RNG_A_VMAX, 1.0f);
  * @group EKF2
  * @min 1.0
  * @max 10.0
+ * @unit m
  */
 PARAM_DEFINE_FLOAT(EKF2_RNG_A_HMAX, 5.0f);
 
@@ -1355,3 +1359,17 @@ PARAM_DEFINE_FLOAT(EKF2_GPS_TAU, 10.0f);
  * @decimal 1
  */
 PARAM_DEFINE_FLOAT(EKF2_MOVE_TEST, 1.0f);
+
+/**
+ * Required GPS health time on startup
+ *
+ * Minimum continuous period without GPS failure required to mark a healthy GPS status.
+ * It can be reduced to speed up initialization, but it's recommended to keep this unchanged for a vehicle.
+ *
+ * @group EKF2
+ * @min 0.1
+ * @decimal 1
+ * @unit s
+ * @reboot_required true
+ */
+PARAM_DEFINE_FLOAT(EKF2_REQ_GPS_H, 10.0f);
