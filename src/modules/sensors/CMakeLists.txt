@@ -31,8 +31,11 @@
 #
 ############################################################################
 
+add_subdirectory(sensor_corrections) # used by vehicle_{acceleration, angular_velocity, imu}
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 add_subdirectory(vehicle_acceleration)
 add_subdirectory(vehicle_angular_velocity)
+add_subdirectory(vehicle_imu)
 
 px4_add_module(
 	MODULE modules__sensors
@@ -40,19 +43,16 @@ px4_add_module(
 	PRIORITY "SCHED_PRIORITY_MAX-5"
 	SRCS
 		voted_sensors_update.cpp
-		rc_update.cpp
 		sensors.cpp
 		parameters.cpp
-		temperature_compensation.cpp
-
 	DEPENDS
 		airspeed
-		battery
 		conversion
 		drivers__device
 		git_ecl
 		ecl_validation
 		mathlib
-		sensors__vehicle_acceleration
-		sensors__vehicle_angular_velocity
+		vehicle_acceleration
+		vehicle_angular_velocity
+		vehicle_imu
 	)

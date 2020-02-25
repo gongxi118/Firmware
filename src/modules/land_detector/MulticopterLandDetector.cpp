@@ -61,7 +61,7 @@
  * @author Julian Oes <julian@oes.ch>
  */
 
-#include <cmath>
+#include <math.h>
 #include <mathlib/mathlib.h>
 #include <matrix/math.hpp>
 
@@ -86,18 +86,19 @@ MulticopterLandDetector::MulticopterLandDetector()
 
 void MulticopterLandDetector::_update_topics()
 {
+	LandDetector::_update_topics();
+
 	_actuator_controls_sub.update(&_actuator_controls);
 	_battery_sub.update(&_battery_status);
-	_vehicle_acceleration_sub.update(&_vehicle_acceleration);
 	_vehicle_angular_velocity_sub.update(&_vehicle_angular_velocity);
-	_vehicle_attitude_sub.update(&_vehicle_attitude);
 	_vehicle_control_mode_sub.update(&_vehicle_control_mode);
-	_vehicle_local_position_sub.update(&_vehicle_local_position);
 	_vehicle_local_position_setpoint_sub.update(&_vehicle_local_position_setpoint);
 }
 
 void MulticopterLandDetector::_update_params()
 {
+	LandDetector::_update_params();
+
 	_freefall_hysteresis.set_hysteresis_time_from(false, (hrt_abstime)(1e6f * _param_lndmc_ffall_ttri.get()));
 
 	param_get(_paramHandle.minThrottle, &_params.minThrottle);
@@ -146,7 +147,6 @@ bool MulticopterLandDetector::_get_ground_contact_state()
 		vertical_movement = fabsf(_vehicle_local_position.vz) > _param_lndmc_z_vel_max.get()  * 2.5f;
 
 	} else {
-
 		// Adjust max_climb_rate if land_speed is lower than 2x max_climb_rate
 		float max_climb_rate = ((land_speed_threshold * 0.5f) < _param_lndmc_z_vel_max.get()) ? (0.5f * land_speed_threshold) :
 				       _param_lndmc_z_vel_max.get();
@@ -164,27 +164,20 @@ bool MulticopterLandDetector::_get_ground_contact_state()
 	bool hit_ground = _in_descend && !vertical_movement;
 
 	// TODO: we need an accelerometer based check for vertical movement for flying without GPS
-	if ((_has_low_thrust() || hit_ground) && (!_horizontal_movement || !_has_position_lock())
-	    && (!vertical_movement || !_has_altitude_lock())) {
-		return true;
-	}
-
-	return false;
+	return (_has_low_thrust() || hit_ground) && (!_horizontal_movement || !_has_position_lock())
+	       && (!vertical_movement || !_has_altitude_lock());
 }
 
 bool MulticopterLandDetector::_get_maybe_landed_state()
 {
-	// Time base for this function
-	const hrt_abstime now = hrt_absolute_time();
-
 	// When not armed, consider to be maybe-landed
-	if (!_actuator_armed.armed || (_vehicle_attitude.timestamp == 0)) {
+	if (!_actuator_armed.armed) {
 		return true;
 	}
 
 	if (_has_minimal_thrust()) {
 		if (_min_trust_start == 0) {
-			_min_trust_start = now;
+			_min_trust_start = hrt_absolute_time();
 		}
 
 	} else {
@@ -214,12 +207,8 @@ bool MulticopterLandDetector::_get_maybe_landed_state()
 		return (_min_trust_start > 0) && (hrt_elapsed_time(&_min_trust_start) > 8_s);
 	}
 
-	if (_ground_contact_hysteresis.get_state() && _has_minimal_thrust() && !rotating) {
-		// Ground contact, no thrust and no movement -> landed
-		return true;
-	}
-
-	return false;
+	// Ground contact, no thrust and no movement -> landed
+	return _ground_contact_hysteresis.get_state() && _has_minimal_thrust() && !rotating;
 }
 
 bool MulticopterLandDetector::_get_landed_state()
@@ -231,19 +220,15 @@ bool MulticopterLandDetector::_get_landed_state()
 
 	// reset the landed_time
 	if (!_maybe_landed_hysteresis.get_state()) {
-
 		_landed_time = 0;
 
 	} else if (_landed_time == 0) {
-
 		_landed_time = hrt_absolute_time();
-
 	}
 
 	// if we have maybe_landed, the mc_pos_control goes into idle (thrust_sp = 0.0)
 	// therefore check if all other condition of the landed state remain true
 	return _maybe_landed_hysteresis.get_state();
-
 }
 
 float MulticopterLandDetector::_get_max_altitude()
@@ -272,9 +257,7 @@ float MulticopterLandDetector::_get_max_altitude()
 
 bool MulticopterLandDetector::_has_altitude_lock()
 {
-	return _vehicle_local_position.timestamp != 0 &&
-	       hrt_elapsed_time(&_vehicle_local_position.timestamp) < 500_ms &&
-	       _vehicle_local_position.z_valid;
+	return (hrt_elapsed_time(&_vehicle_local_position.timestamp) < 1_s) && _vehicle_local_position.z_valid;
 }
 
 bool MulticopterLandDetector::_has_position_lock()
@@ -284,8 +267,7 @@ bool MulticopterLandDetector::_has_position_lock()
 
 bool MulticopterLandDetector::_is_climb_rate_enabled()
 {
-	bool has_updated = (_vehicle_local_position_setpoint.timestamp != 0)
-			   && (hrt_elapsed_time(&_vehicle_local_position_setpoint.timestamp) < 500_ms);
+	bool has_updated = (hrt_elapsed_time(&_vehicle_local_position_setpoint.timestamp) < 1_s);
 
 	return (_vehicle_control_mode.flag_control_climb_rate_enabled && has_updated
 		&& PX4_ISFINITE(_vehicle_local_position_setpoint.vz));
@@ -317,12 +299,7 @@ bool MulticopterLandDetector::_has_minimal_thrust()
 
 bool MulticopterLandDetector::_get_ground_effect_state()
 {
-	if (_in_descend && !_horizontal_movement) {
-		return true;
-
-	} else {
-		return false;
-	}
+	return _in_descend && !_horizontal_movement;
 }
 
 } // namespace land_detector

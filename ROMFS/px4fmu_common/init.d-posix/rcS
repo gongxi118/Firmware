@@ -55,9 +55,21 @@ fi
 
 
 uorb start
-if [ -f eeprom/parameters ]
+
+# Load parameters
+set PARAM_FILE eeprom/parameters_"$REQUESTED_AUTOSTART"
+param select $PARAM_FILE
+
+if [ -f $PARAM_FILE ]
 then
-	param load
+	if param load
+	then
+		echo "[param] Loaded: $PARAM_FILE"
+	else
+		echo "[param] FAILED loading $PARAM_FILE"
+	fi
+else
+	echo "[param] parameter file not found, creating $PARAM_FILE"
 fi
 
 # exit early when the minimal shell is requested
@@ -80,6 +92,15 @@ then
 	set AUTOCNF no
 else
 	set AUTOCNF yes
+	param set SYS_AUTOCONFIG 1
+fi
+
+if param compare SYS_AUTOCONFIG 1
+then
+	set AUTOCNF yes
+
+	# Wipe out params except RC*, flight modes, total flight time, accel cal, gyro cal, next flight UUID
+	param reset_nostart RC* COM_FLTMODE* LND_FLIGHT_T_* TC_* CAL_ACC* CAL_GYRO* COM_FLIGHT_UUID
 fi
 
 # multi-instance setup
@@ -88,7 +109,9 @@ param set MAV_SYS_ID $((px4_instance+1))
 simulator_tcp_port=$((4560+px4_instance))
 udp_offboard_port_local=$((14580+px4_instance))
 udp_offboard_port_remote=$((14540+px4_instance))
-udp_gcs_port_local=$((14570+px4_instance))
+[ $px4_instance -gt 9 ] && udp_offboard_port_remote=14549 # use the same ports for more than 10 instances to avoid port overlaps
+udp_gcs_port_local=$((18570+px4_instance))
+
 
 if [ $AUTOCNF = yes ]
 then
@@ -109,7 +132,7 @@ then
 
 	param set CBRK_AIRSPD_CHK 0
 
-	param set COM_DISARM_LAND 0.1
+	param set COM_DISARM_LAND 0.5
 	param set COM_OBL_ACT 2
 	param set COM_OBL_RC_ACT 0
 	param set COM_OF_LOSS_T 5
@@ -119,13 +142,15 @@ then
 	param set EKF2_ANGERR_INIT 0.01
 	param set EKF2_HGT_MODE 0
 	param set EKF2_GBIAS_INIT 0.01
+
+	# Prevent high accel bias
+	param set COM_ARM_EKF_AB 0.005
+
 	# Speedup SITL startup
 	param set EKF2_REQ_GPS_H 0.5
 
 	# LPE: GPS only mode
 	param set LPE_FUSION 145
-
-	param set MIS_TAKEOFF_ALT 2.5
 
 	param set MC_PITCH_P 6
 	param set MC_PITCHRATE_P 0.2
@@ -144,6 +169,8 @@ then
 	param set MPC_JERK_MIN 10
 	param set MPC_JERK_MAX 20
 	param set MPC_ACC_HOR_MAX 3
+	param set MPC_SPOOLUP_TIME 0.5
+	param set MPC_TKO_RAMP_T 1
 
 	param set NAV_ACC_RAD 2
 	param set NAV_DLL_ACT 2
@@ -202,23 +229,30 @@ fi
 
 sh "$autostart_file"
 
+#
+# If autoconfig parameter was set, reset it and save parameters.
+#
+if [ $AUTOCNF = yes ]
+then
+	param set SYS_AUTOCONFIG 0
+fi
 
 dataman start
 replay tryapplyparams
 simulator start -c $simulator_tcp_port
 tone_alarm start
-gpssim start
+rc_update start
 sensors start
 commander start
 navigator start
 
 
-if ! param compare MNT_MODE_IN -1
+if ! param compare -s MNT_MODE_IN -1
 then
 	vmount start
 fi
 
-if param greater TRIG_MODE 0
+if param greater -s TRIG_MODE 0
 then
 	camera_trigger start
 	camera_feedback start

@@ -62,13 +62,13 @@
 #include <drivers/device/ringbuffer.h>
 #include <parameters/param.h>
 #include <perf/perf_counter.h>
-#include <px4_cli.h>
-#include <px4_config.h>
-#include <px4_defines.h>
-#include <px4_getopt.h>
-#include <px4_module.h>
-#include <px4_module_params.h>
-#include <px4_posix.h>
+#include <px4_platform_common/cli.h>
+#include <px4_platform_common/px4_config.h>
+#include <px4_platform_common/defines.h>
+#include <px4_platform_common/getopt.h>
+#include <px4_platform_common/module.h>
+#include <px4_platform_common/module_params.h>
+#include <px4_platform_common/posix.h>
 #include <systemlib/mavlink_log.h>
 #include <systemlib/uthash/utlist.h>
 #include <uORB/PublicationQueued.hpp>
@@ -163,8 +163,6 @@ public:
 	static bool		serial_instance_exists(const char *device_name, Mavlink *self);
 
 	static void		forward_message(const mavlink_message_t *msg, Mavlink *self);
-
-	static int		get_uart_fd(unsigned index);
 
 	int			get_uart_fd() const { return _uart_fd; }
 
@@ -304,7 +302,7 @@ public:
 	 *
 	 * @param generation_enabled If set to true, generate RC_INPUT messages
 	 */
-	void			set_manual_input_mode_generation(bool generation_enabled) { _generate_rc = generation_enabled; }
+	void			set_generate_virtual_rc_input(bool generation_enabled) { _generate_rc = generation_enabled; }
 
 	/**
 	 * Set communication protocol for this mavlink instance
@@ -316,7 +314,7 @@ public:
 	 *
 	 * @return true if manual inputs should generate RC data
 	 */
-	bool			get_manual_input_mode_generation() { return _generate_rc; }
+	bool			should_generate_virtual_rc_input() { return _generate_rc; }
 
 	/**
 	 * This is the beginning of a MAVLINK_START_UART_SEND/MAVLINK_END_UART_SEND transaction
@@ -532,6 +530,8 @@ public:
 	 */
 	struct ping_statistics_s &get_ping_statistics() { return _ping_stats; }
 
+	static hrt_abstime &get_first_start_time() { return _first_start_time; }
+
 protected:
 	Mavlink			*next{nullptr};
 
@@ -546,7 +546,7 @@ private:
 
 	uORB::PublicationQueued<telemetry_status_s>	_telem_status_pub{ORB_ID(telemetry_status)};
 
-	bool			_task_running{false};
+	bool			_task_running{true};
 	static bool		_boot_complete;
 	static constexpr int	MAVLINK_MAX_INSTANCES{4};
 	static constexpr int	MAVLINK_MIN_INTERVAL{1500};
@@ -583,6 +583,7 @@ private:
 
 	bool			_forwarding_on{false};
 	bool			_ftp_on{false};
+	bool			_use_software_mav_throttling{false};
 
 	int			_uart_fd{-1};
 
@@ -662,7 +663,7 @@ private:
 		(ParamInt<px4::params::MAV_SYS_ID>) _param_mav_sys_id,
 		(ParamInt<px4::params::MAV_COMP_ID>) _param_mav_comp_id,
 		(ParamInt<px4::params::MAV_PROTO_VER>) _param_mav_proto_ver,
-		(ParamInt<px4::params::MAV_RADIO_ID>) _param_mav_radio_id,
+		(ParamInt<px4::params::MAV_SIK_RADIO_ID>) _param_sik_radio_id,
 		(ParamInt<px4::params::MAV_TYPE>) _param_mav_type,
 		(ParamBool<px4::params::MAV_USEHILGPS>) _param_mav_usehilgps,
 		(ParamBool<px4::params::MAV_FWDEXTSP>) _param_mav_fwdextsp,
@@ -672,6 +673,7 @@ private:
 		(ParamBool<px4::params::MAV_HASH_CHK_EN>) _param_mav_hash_chk_en,
 		(ParamBool<px4::params::MAV_HB_FORW_EN>) _param_mav_hb_forw_en,
 		(ParamBool<px4::params::MAV_ODOM_LP>) _param_mav_odom_lp,
+		(ParamInt<px4::params::MAV_RADIO_TOUT>)      _param_mav_radio_timeout,
 		(ParamInt<px4::params::SYS_HITL>) _param_sys_hitl
 	)
 
@@ -687,6 +689,8 @@ private:
 	static constexpr unsigned RADIO_BUFFER_CRITICAL_LOW_PERCENTAGE = 25;
 	static constexpr unsigned RADIO_BUFFER_LOW_PERCENTAGE = 35;
 	static constexpr unsigned RADIO_BUFFER_HALF_PERCENTAGE = 50;
+
+	static hrt_abstime _first_start_time;
 
 	/**
 	 * Configure a single stream.
@@ -720,13 +724,15 @@ private:
 
 	void publish_telemetry_status();
 
+	void check_requested_subscriptions();
+
 	/**
-	 * Check the configuration of a connected radio
+	 * Reconfigure a SiK radio if requested by MAV_SIK_RADIO_ID
 	 *
 	 * This convenience function allows to re-configure a connected
-	 * radio without removing it from the main system harness.
+	 * SiK radio without removing it from the main system harness.
 	 */
-	void check_radio_config();
+	void configure_sik_radio();
 
 	/**
 	 * Update rate mult so total bitrate will be equal to _datarate.
